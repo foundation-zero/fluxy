@@ -1,0 +1,350 @@
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, fields
+from datetime import datetime, timedelta
+from enum import Enum
+from functools import reduce
+from typing import Callable, Optional, TypeVar, overload
+
+
+def dedent(val: str) -> str:
+    lines = val.split("\n")
+    return "\n".join(line.strip() for line in lines)
+
+
+def pipe(val, *ops):
+    return reduce(lambda acc, cur: cur(acc), ops, val)
+
+
+@dataclass
+class From:
+    bucket: str
+
+    def to_flux(self) -> str:
+        return f'from(bucket: "{self.bucket}")'
+
+
+@dataclass
+class PipedFunction(ABC):
+    previous: "Query"
+
+    def to_flux(self) -> str:
+        arguments = [
+            f"{PipedFunction._snakecase_to_camelcase(field.name)}: {PipedFunction._to_flux(getattr(self, field.name))}"
+            for field in fields(self.__class__)
+            if field.name != "previous"
+        ]
+        return dedent(
+            f"""\
+                {self.previous.to_flux()}
+                |> {self.function}({", ".join(arguments)})"""
+        )
+
+    @property
+    def function(self) -> str:
+        name = self.__class__.__name__
+        return name[0:1].lower() + name[1:]
+
+    @staticmethod
+    def _snakecase_to_camelcase(val: str) -> str:
+        upper_camel_case = "".join(part.capitalize() for part in val.split("_"))
+        return upper_camel_case[0:1].lower() + upper_camel_case[1:]
+
+    @staticmethod
+    def _list_to_flux(list):
+        return "[" + ", ".join(f'"{key}"' for key in list) + "]"
+
+    @staticmethod
+    def _timedelta_to_flux(every: timedelta) -> str:
+        def _part(value: int, unit: str) -> str:
+            return f"{value}{unit}" if value != 0 else ""
+
+        return "".join(
+            [
+                _part(every.days, "d"),
+                _part(every.seconds, "s"),
+                _part(every.microseconds, "us"),
+            ]
+        )
+
+    @staticmethod
+    def _to_flux(value: list[str] | bool | str | timedelta):
+        match value:
+            case str():
+                return f'"{value}"'
+            case bool():
+                return bool_to_flux(value)
+            case list():
+                return PipedFunction._list_to_flux(value)
+            case timedelta():
+                return PipedFunction._timedelta_to_flux(value)
+            case datetime():
+                return value.isoformat()
+            case Enum():
+                return value.value
+
+
+@dataclass
+class Range(PipedFunction):
+    previous: From
+    start: datetime
+    stop: datetime
+
+
+@dataclass
+class RangeOffset(PipedFunction):
+    previous: From
+    start: timedelta
+
+    @property
+    def function(self) -> str:
+        return "range"
+
+
+@dataclass
+class LiteralStringExpression:
+    value: str
+
+    def to_flux(self):
+        return f'"{self.value}"'
+
+
+Expression = LiteralStringExpression
+
+
+def parse_expression(value):
+    match value:
+        case str():
+            return LiteralStringExpression(value)
+        case _:
+            raise Exception(f"didn't recognize expression {value}")
+
+
+@dataclass
+class Clause(ABC):
+    @staticmethod
+    def parse(val: "Clausable") -> "Clause":
+        match val:
+            case bool():
+                return LiteralClause(val)
+            case _:
+                return val
+
+    def should_parenthesize(self, other: "Clause") -> bool:
+        return self.precedence < other.precedence
+
+    def ensure_precedence(self, other: "Clause") -> str:
+        return (
+            f"({other.to_flux()})"
+            if self.should_parenthesize(other)
+            else other.to_flux()
+        )
+
+    def __or__(self, other: "Clausable") -> "Clause":
+        return BinaryClause(BinaryOperation.OR, self, Clause.parse(other))
+
+    def __and__(self, other: "Clausable") -> "Clause":
+        return BinaryClause(BinaryOperation.AND, self, Clause.parse(other))
+
+    @abstractmethod
+    def to_flux(self) -> str:
+        pass
+
+    @property
+    @abstractmethod
+    def precedence(self) -> int:
+        pass
+
+
+Clausable = Clause | bool
+
+
+def bool_to_flux(val: bool) -> str:
+    return "true" if val else "false"
+
+
+@dataclass
+class LiteralClause(Clause):
+    literal: bool
+
+    def to_flux(self) -> str:
+        return bool_to_flux(self.literal)
+
+    @property
+    def precedence(self) -> int:
+        return 0
+
+
+class BinaryOperation(Enum):
+    OR = "or"
+    AND = "and"
+
+
+@dataclass
+class BinaryClause(Clause):
+    operation: BinaryOperation
+    left: "Clause"
+    right: "Clause"
+
+    def to_flux(self) -> str:
+        return f"{self.ensure_precedence(self.left)} {self.operation.value} {self.ensure_precedence(self.right)}"
+
+    @property
+    def precedence(self) -> int:
+        match self.operation:
+            case BinaryOperation.AND:
+                return 9
+            case BinaryOperation.OR:
+                return 10
+
+
+class ComparisonOperation(Enum):
+    EQ = "=="
+    NE = "!="
+
+
+@dataclass
+class ComparisonClause(Clause):
+    operation: ComparisonOperation
+    name: str
+    expression: Expression
+
+    @property
+    def precedence(self) -> int:
+        return 7
+
+    def to_flux(self) -> str:
+        return (
+            f"""r["{self.name}"] {self.operation.value} {self.expression.to_flux()}"""
+        )
+
+
+@dataclass
+class Field:
+    name: str
+
+    def __eq__(self, other) -> ComparisonClause:
+        return ComparisonClause(
+            ComparisonOperation.EQ, self.name, parse_expression(other)
+        )
+
+    def __ne__(self, other) -> ComparisonClause:
+        return ComparisonClause(
+            ComparisonOperation.NE, self.name, parse_expression(other)
+        )
+
+
+class Row:
+    def __getattr__(self, name):
+        return Field(name)
+
+    def __getitem__(self, name):
+        return Field(name)
+
+
+@dataclass
+class Filter:
+    previous: "Query"
+    clause: Clause
+
+    def to_flux(self) -> str:
+        return dedent(
+            f"""\
+      {self.previous.to_flux()}
+      |> filter(fn: (r) => {self.clause.to_flux()})"""
+        )
+
+
+@dataclass
+class Pivot(PipedFunction):
+    row_key: list[str]
+    column_key: list[str]
+    value_column: str
+
+
+@dataclass
+class AggregateWindow(PipedFunction):
+    every: timedelta
+    fn: "WindowOperation"
+    create_empty: bool
+
+
+@dataclass
+class Drop(PipedFunction):
+    columns: list[str]
+
+
+Query = AggregateWindow | Range | RangeOffset | Filter | Pivot | Drop
+
+
+def from_bucket(bucket: str) -> From:
+    return From(bucket)
+
+
+@overload
+def range(start: timedelta) -> Callable[[From], RangeOffset]:
+    ...
+
+
+@overload
+def range(start: datetime, stop: datetime) -> Callable[[From], Range]:
+    ...
+
+
+def range(
+    start: timedelta | datetime, stop: Optional[datetime] = None
+) -> Callable[[From], Range | RangeOffset]:
+    match start:
+        case timedelta():
+            return lambda from_bucket: RangeOffset(from_bucket, start)
+        case datetime() if stop is not None:
+            return lambda from_bucket: Range(from_bucket, start, stop)
+        case _:
+            raise Exception("invalid types")
+
+
+ranged = range
+
+FilterCallback = Callable[[Row], Clausable]
+
+
+def filter(callback: FilterCallback) -> Callable[[Query], Filter]:
+    return lambda previous: Filter(previous, Clause.parse(callback(Row())))
+
+
+def pivot(
+    row_key: list[str], column_key: list[str], value_column: str
+) -> Callable[[Query], Pivot]:
+    return lambda previous: Pivot(previous, row_key, column_key, value_column)
+
+
+def conform(value: dict[str, str]) -> FilterCallback:
+    return lambda row: reduce(
+        lambda acc, cur: acc & cur, (row[key] == value for key, value in value.items())
+    )
+
+
+T = TypeVar("T")
+
+
+def any(test: Callable[[T], FilterCallback], values: list[T]) -> FilterCallback:
+    return lambda row: reduce(
+        lambda acc, cur: acc | cur, (Clause.parse(test(value)(row)) for value in values)
+    )
+
+
+some = any
+
+
+class WindowOperation(Enum):
+    MEAN = "mean"
+    LAST = "last"
+
+
+def aggregate_window(
+    every: timedelta, fn: WindowOperation, create_empty: bool
+) -> Callable[[Query], AggregateWindow]:
+    return lambda result: AggregateWindow(result, every, fn, create_empty)
+
+
+def drop(columns: list[str]) -> Callable[[Query], Drop]:
+    return lambda result: Drop(result, columns)
