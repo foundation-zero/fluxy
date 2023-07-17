@@ -20,14 +20,6 @@ def test_from_bucket():
     assert from_bucket("bucket").to_flux() == 'from(bucket: "bucket")'
 
 
-def test_pipe():
-    assert pipe(1) == 1
-
-
-def test_pipe_function():
-    assert pipe(1, lambda x: x + 1) == 2
-
-
 def test_from_range():
     expected = dedent(
         """\

@@ -3,7 +3,7 @@ from dataclasses import dataclass, fields
 from datetime import datetime, timedelta
 from enum import Enum
 from functools import reduce
-from typing import Callable, Optional, TypeVar, overload
+from typing import Callable, List, Optional, TypeVar, overload
 
 
 def dedent(val: str) -> str:
@@ -11,8 +11,22 @@ def dedent(val: str) -> str:
     return "\n".join(line.strip() for line in lines)
 
 
-def pipe(val, *ops):
-    return reduce(lambda acc, cur: cur(acc), ops, val)
+@dataclass
+class Pipe:
+    initial: "From"
+    range: "Range | RangeOffset"
+    operations: "List[Operation]"
+
+    def to_flux(self) -> str:
+        fluxes = (op.to_flux() for op in [self.initial, self.range, *self.operations])
+        return "\n|> ".join(fluxes)
+
+
+def pipe(from_bucket: "From", range: "Range | RangeOffset", *ops: "Operation"):
+    return Pipe(from_bucket, range, list(ops))
+
+
+Query = Pipe
 
 
 @dataclass
@@ -25,19 +39,12 @@ class From:
 
 @dataclass
 class PipedFunction(ABC):
-    previous: "Query"
-
     def to_flux(self) -> str:
         arguments = [
             f"{PipedFunction._snakecase_to_camelcase(field.name)}: {PipedFunction._to_flux(getattr(self, field.name))}"
             for field in fields(self.__class__)
-            if field.name != "previous"
         ]
-        return dedent(
-            f"""\
-                {self.previous.to_flux()}
-                |> {self.function}({", ".join(arguments)})"""
-        )
+        return dedent(f"""{self.function}({", ".join(arguments)})""")
 
     @property
     def function(self) -> str:
@@ -85,14 +92,12 @@ class PipedFunction(ABC):
 
 @dataclass
 class Range(PipedFunction):
-    previous: From
     start: datetime
     stop: datetime
 
 
 @dataclass
 class RangeOffset(PipedFunction):
-    previous: From
     start: timedelta
 
     @property
@@ -243,15 +248,10 @@ class Row:
 
 @dataclass
 class Filter:
-    previous: "Query"
     clause: Clause
 
     def to_flux(self) -> str:
-        return dedent(
-            f"""\
-      {self.previous.to_flux()}
-      |> filter(fn: (r) => {self.clause.to_flux()})"""
-        )
+        return dedent(f"""filter(fn: (r) => {self.clause.to_flux()})""")
 
 
 @dataclass
@@ -273,7 +273,7 @@ class Drop(PipedFunction):
     columns: list[str]
 
 
-Query = AggregateWindow | Range | RangeOffset | Filter | Pivot | Drop
+Operation = AggregateWindow | Range | RangeOffset | Filter | Pivot | Drop
 
 
 def from_bucket(bucket: str) -> From:
@@ -281,23 +281,23 @@ def from_bucket(bucket: str) -> From:
 
 
 @overload
-def range(start: timedelta) -> Callable[[From], RangeOffset]:
+def range(start: timedelta) -> RangeOffset:
     ...
 
 
 @overload
-def range(start: datetime, stop: datetime) -> Callable[[From], Range]:
+def range(start: datetime, stop: datetime) -> Range:
     ...
 
 
 def range(
     start: timedelta | datetime, stop: Optional[datetime] = None
-) -> Callable[[From], Range | RangeOffset]:
+) -> Range | RangeOffset:
     match start:
         case timedelta():
-            return lambda from_bucket: RangeOffset(from_bucket, start)
+            return RangeOffset(start)
         case datetime() if stop is not None:
-            return lambda from_bucket: Range(from_bucket, start, stop)
+            return Range(start, stop)
         case _:
             raise Exception("invalid types")
 
@@ -307,14 +307,12 @@ ranged = range
 FilterCallback = Callable[[Row], Clausable]
 
 
-def filter(callback: FilterCallback) -> Callable[[Query], Filter]:
-    return lambda previous: Filter(previous, Clause.parse(callback(Row())))
+def filter(callback: FilterCallback) -> Filter:
+    return Filter(Clause.parse(callback(Row())))
 
 
-def pivot(
-    row_key: list[str], column_key: list[str], value_column: str
-) -> Callable[[Query], Pivot]:
-    return lambda previous: Pivot(previous, row_key, column_key, value_column)
+def pivot(row_key: list[str], column_key: list[str], value_column: str) -> Pivot:
+    return Pivot(row_key, column_key, value_column)
 
 
 def conform(value: dict[str, str]) -> FilterCallback:
@@ -342,9 +340,9 @@ class WindowOperation(Enum):
 
 def aggregate_window(
     every: timedelta, fn: WindowOperation, create_empty: bool
-) -> Callable[[Query], AggregateWindow]:
-    return lambda result: AggregateWindow(result, every, fn, create_empty)
+) -> AggregateWindow:
+    return AggregateWindow(every, fn, create_empty)
 
 
-def drop(columns: list[str]) -> Callable[[Query], Drop]:
-    return lambda result: Drop(result, columns)
+def drop(columns: list[str]) -> Drop:
+    return Drop(columns)
