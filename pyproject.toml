@@ -7,6 +7,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.10"
+pyright = "^1.1.318"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
