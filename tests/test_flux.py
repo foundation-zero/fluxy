@@ -328,3 +328,46 @@ def test_drop(range_query):
     )
 
     assert (pipe(range_query, drop(["topic"])).to_flux()) == expected
+
+
+def test_pipe_a_partial_pipe():
+    start = pipe(from_bucket("bucket"))
+    total = pipe(start, range(timedelta(minutes=1)))
+
+    expected = dedent(
+        """\
+                from(bucket: "bucket")
+                |> range(start: 60s)"""
+    )
+
+    assert total.to_flux() == expected
+
+
+def test_pipe_a_pipe():
+    start = pipe(from_bucket("bucket"), range(timedelta(minutes=1)))
+    total = pipe(start)
+
+    expected = dedent(
+        """\
+                from(bucket: "bucket")
+                |> range(start: 60s)"""
+    )
+
+    assert total.to_flux() == expected
+
+
+def test_pipe_a_pipe_with_args():
+    start = pipe(from_bucket("bucket"), range(timedelta(minutes=1)))
+    total = pipe(
+        start,
+        filter(lambda r: r.topic == "test_topic"),
+    )
+
+    expected = dedent(
+        """\
+                from(bucket: "bucket")
+                |> range(start: 60s)
+                |> filter(fn: (r) => r["topic"] == "test_topic")"""
+    )
+
+    assert total.to_flux() == expected

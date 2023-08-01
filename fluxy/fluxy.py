@@ -3,12 +3,17 @@ from dataclasses import dataclass, fields
 from datetime import datetime, timedelta
 from enum import Enum
 from functools import reduce
-from typing import Callable, List, Optional, TypeVar, overload
+from typing import Callable, List, Optional, TypeVar, cast, overload
 
 
 def dedent(val: str) -> str:
     lines = val.split("\n")
     return "\n".join(line.strip() for line in lines)
+
+
+@dataclass
+class PartialPipe:
+    initial: "From"
 
 
 @dataclass
@@ -22,8 +27,55 @@ class Pipe:
         return "\n|> ".join(fluxes)
 
 
-def pipe(from_bucket: "From", range: "Range | RangeOffset", *ops: "Operation"):
-    return Pipe(from_bucket, range, list(ops))
+@overload
+def pipe(first: "From") -> PartialPipe:
+    ...
+
+
+@overload
+def pipe(first: PartialPipe) -> PartialPipe:
+    ...
+
+
+@overload
+def pipe(first: Pipe) -> Pipe:
+    ...
+
+
+@overload
+def pipe(
+    first: "PartialPipe | From", second: "Range | RangeOffset", *ops: "Operation"
+) -> Pipe:
+    ...
+
+
+@overload
+def pipe(first: Pipe, *ops: "Operation") -> Pipe:
+    ...
+
+
+def pipe(
+    first: "From | Pipe | PartialPipe",
+    second: "Range | RangeOffset | Operation | None" = None,
+    *ops: "Operation",
+) -> Pipe | PartialPipe:
+    match (first, second):
+        case (From(_) as from_bucket, None):
+            return PartialPipe(from_bucket)
+        case (From(_) as from_bucket, Range(_) | RangeOffset(_) as range):
+            return Pipe(from_bucket, range, list(ops))
+        case (PartialPipe(_) as pipe, None):
+            return pipe
+        case (PartialPipe(_) as pipe, Range(_) | RangeOffset(_) as range):
+            return Pipe(pipe.initial, range, list(ops))
+        case (Pipe(_) as pipe, None):
+            return pipe
+        case (Pipe(_) as pipe, op):
+            return Pipe(
+                pipe.initial, pipe.range, [*pipe.operations, cast(Operation, op), *ops]
+            )
+        case _:
+            raise Exception("invalid types")
 
 
 Query = Pipe
