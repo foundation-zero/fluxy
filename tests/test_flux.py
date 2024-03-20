@@ -330,6 +330,17 @@ def test_drop(range_query):
     assert (pipe(range_query, drop(["topic"])).to_flux()) == expected
 
 
+def test_keep(range_query):
+    expected = dedent(
+        """\
+                      from(bucket: "bucket")
+                      |> range(start: 2020-01-01T00:00:00+00:00, stop: 2022-01-01T00:00:00+00:00)
+                      |> keep(columns: ["topic"])"""
+    )
+
+    assert (pipe(range_query, keep(["topic"])).to_flux()) == expected
+
+
 def test_pipe_a_partial_pipe():
     start = pipe(from_bucket("bucket"))
     total = pipe(start, range(timedelta(minutes=1)))
