@@ -325,7 +325,12 @@ class Drop(PipedFunction):
     columns: list[str]
 
 
-Operation = AggregateWindow | Range | RangeOffset | Filter | Pivot | Drop
+@dataclass
+class Keep(PipedFunction):
+    columns: list[str]
+
+
+Operation = AggregateWindow | Range | RangeOffset | Filter | Pivot | Drop | Keep
 
 
 def from_bucket(bucket: str) -> From:
@@ -398,3 +403,7 @@ def aggregate_window(
 
 def drop(columns: list[str]) -> Drop:
     return Drop(columns)
+
+
+def keep(columns: list[str]) -> Keep:
+    return Keep(columns)
