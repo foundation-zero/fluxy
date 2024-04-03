@@ -330,7 +330,15 @@ class Keep(PipedFunction):
     columns: list[str]
 
 
-Operation = AggregateWindow | Range | RangeOffset | Filter | Pivot | Drop | Keep
+@dataclass
+class Map:
+    fn: str
+
+    def to_flux(self) -> str:
+        return f"map(fn: {self.fn})"
+
+
+Operation = AggregateWindow | Range | RangeOffset | Filter | Pivot | Drop | Keep | Map
 
 
 def from_bucket(bucket: str) -> From:
@@ -407,3 +415,7 @@ def drop(columns: list[str]) -> Drop:
 
 def keep(columns: list[str]) -> Keep:
     return Keep(columns)
+
+
+def map(function: str) -> Map:
+    return Map(function)
