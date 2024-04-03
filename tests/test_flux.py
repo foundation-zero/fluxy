@@ -341,6 +341,19 @@ def test_keep(range_query):
     assert (pipe(range_query, keep(["topic"])).to_flux()) == expected
 
 
+def test_map(range_query):
+    expected = dedent(
+        """\
+                      from(bucket: "bucket")
+                      |> range(start: 2020-01-01T00:00:00+00:00, stop: 2022-01-01T00:00:00+00:00)
+                      |> map(fn: (r) => ({ r with newColumn: r._value * 2 }))"""
+    )
+
+    assert (
+        pipe(range_query, map("(r) => ({ r with newColumn: r._value * 2 })")).to_flux()
+    ) == expected
+
+
 def test_pipe_a_partial_pipe():
     start = pipe(from_bucket("bucket"))
     total = pipe(start, range(timedelta(minutes=1)))
