@@ -354,6 +354,17 @@ def test_map(range_query):
     ) == expected
 
 
+def test_sum(range_query):
+    expected = dedent(
+        """\
+                      from(bucket: "bucket")
+                      |> range(start: 2020-01-01T00:00:00+00:00, stop: 2022-01-01T00:00:00+00:00)
+                      |> sum(column: "test")"""
+    )
+
+    assert (pipe(range_query, sum("test")).to_flux()) == expected
+
+
 def test_pipe_a_partial_pipe():
     start = pipe(from_bucket("bucket"))
     total = pipe(start, range(timedelta(minutes=1)))
