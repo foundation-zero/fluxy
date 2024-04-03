@@ -338,7 +338,17 @@ class Map:
         return f"map(fn: {self.fn})"
 
 
-Operation = AggregateWindow | Range | RangeOffset | Filter | Pivot | Drop | Keep | Map
+@dataclass
+class Sum:
+    column: str
+
+    def to_flux(self) -> str:
+        return f'sum(column: "{self.column}")'
+
+
+Operation = (
+    AggregateWindow | Range | RangeOffset | Filter | Pivot | Drop | Keep | Map | Sum
+)
 
 
 def from_bucket(bucket: str) -> From:
@@ -419,3 +429,7 @@ def keep(columns: list[str]) -> Keep:
 
 def map(function: str) -> Map:
     return Map(function)
+
+
+def sum(columns: str) -> Sum:
+    return Sum(columns)
