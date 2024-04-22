@@ -3,12 +3,17 @@ from dataclasses import dataclass, fields
 from datetime import datetime, timedelta
 from enum import Enum
 from functools import reduce
-from typing import Callable, List, Optional, TypeVar, cast, overload
+from typing import Callable, List, Optional, Protocol, TypeVar, cast, overload
 
 
 def dedent(val: str) -> str:
     lines = val.split("\n")
     return "\n".join(line.strip() for line in lines)
+
+
+class Operation(Protocol):
+    def to_flux(self) -> str:
+        ...
 
 
 @dataclass
@@ -349,20 +354,6 @@ class Sum:
 class Last:
     def to_flux(self) -> str:
         return "last()"
-
-
-Operation = (
-    AggregateWindow
-    | Range
-    | RangeOffset
-    | Filter
-    | Pivot
-    | Drop
-    | Keep
-    | Map
-    | Sum
-    | Last
-)
 
 
 def from_bucket(bucket: str) -> From:
