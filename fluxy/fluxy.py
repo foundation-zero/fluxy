@@ -346,8 +346,22 @@ class Sum:
         return f'sum(column: "{self.column}")'
 
 
+class Last:
+    def to_flux(self) -> str:
+        return "last()"
+
+
 Operation = (
-    AggregateWindow | Range | RangeOffset | Filter | Pivot | Drop | Keep | Map | Sum
+    AggregateWindow
+    | Range
+    | RangeOffset
+    | Filter
+    | Pivot
+    | Drop
+    | Keep
+    | Map
+    | Sum
+    | Last
 )
 
 
@@ -433,3 +447,7 @@ def map(function: str) -> Map:
 
 def sum(columns: str) -> Sum:
     return Sum(columns)
+
+
+def last() -> Last:
+    return Last()
