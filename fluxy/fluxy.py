@@ -416,6 +416,7 @@ some = any
 class WindowOperation(Enum):
     MEAN = "mean"
     LAST = "last"
+    SUM = "sum"
 
 
 def aggregate_window(
