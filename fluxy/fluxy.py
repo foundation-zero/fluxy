@@ -351,6 +351,14 @@ class Sum:
         return f'sum(column: "{self.column}")'
 
 
+@dataclass
+class Mean:
+    column: str
+
+    def to_flux(self) -> str:
+        return f'mean(column: "{self.column}")'
+
+
 class Last:
     def to_flux(self) -> str:
         return "last()"
@@ -437,9 +445,13 @@ def map(function: str) -> Map:
     return Map(function)
 
 
-def sum(columns: str) -> Sum:
-    return Sum(columns)
+def sum(column: str) -> Sum:
+    return Sum(column)
 
 
 def last() -> Last:
     return Last()
+
+
+def mean(column: str) -> Mean:
+    return Mean(column)
