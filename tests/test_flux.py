@@ -365,6 +365,17 @@ def test_sum(range_query):
     assert (pipe(range_query, sum("test")).to_flux()) == expected
 
 
+def test_mean(range_query):
+    expected = dedent(
+        """\
+                      from(bucket: "bucket")
+                      |> range(start: 2020-01-01T00:00:00+00:00, stop: 2022-01-01T00:00:00+00:00)
+                      |> mean(column: "test")"""
+    )
+
+    assert (pipe(range_query, mean("test")).to_flux()) == expected
+
+
 def test_last(range_query):
     expected = dedent(
         """\
