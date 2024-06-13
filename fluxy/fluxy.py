@@ -373,6 +373,16 @@ class Limit:
         return f"limit(n: {self.n}, offset: {self.offset})"
 
 
+@dataclass
+class Sort:
+    columns: list[str]
+    desc: bool
+
+    def to_flux(self) -> str:
+        columns_string = '", "'.join(self.columns)
+        return f'sort(columns: ["{columns_string}"], desc: {str(self.desc).lower()})'
+
+
 def from_bucket(bucket: str) -> From:
     return From(bucket)
 
@@ -468,3 +478,7 @@ def mean(column: str) -> Mean:
 
 def limit(n: int, offset: int = 0):
     return Limit(n, offset)
+
+
+def sort(columns: list[str] = ["_value"], desc: bool = False):
+    return Sort(columns, desc)
