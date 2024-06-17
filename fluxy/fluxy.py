@@ -373,14 +373,19 @@ class Limit:
         return f"limit(n: {self.n}, offset: {self.offset})"
 
 
+class SortOrder(Enum):
+    DESC = "desc"
+    ASC = "asc"
+
+
 @dataclass
 class Sort:
     columns: list[str]
-    desc: bool
+    sort_order: SortOrder
 
     def to_flux(self) -> str:
         columns_string = '", "'.join(self.columns)
-        return f'sort(columns: ["{columns_string}"], desc: {str(self.desc).lower()})'
+        return f'sort(columns: ["{columns_string}"], desc: {"true" if self.sort_order == SortOrder.DESC else "false"})'
 
 
 def from_bucket(bucket: str) -> From:
@@ -480,5 +485,5 @@ def limit(n: int, offset: int = 0):
     return Limit(n, offset)
 
 
-def sort(columns: list[str] = ["_value"], desc: bool = False):
-    return Sort(columns, desc)
+def sort(columns: list[str] = ["_value"], sort_order: SortOrder = SortOrder.DESC):
+    return Sort(columns, sort_order)
