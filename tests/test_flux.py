@@ -387,6 +387,28 @@ def test_last(range_query):
     assert (pipe(range_query, last()).to_flux()) == expected
 
 
+def test_limit(range_query):
+    expected = dedent(
+        """\
+                      from(bucket: "bucket")
+                      |> range(start: 2020-01-01T00:00:00+00:00, stop: 2022-01-01T00:00:00+00:00)
+                      |> limit(n: 0, offset: 0)"""
+    )
+
+    assert (pipe(range_query, limit(0)).to_flux()) == expected
+
+
+def test_limit_offset(range_query):
+    expected = dedent(
+        """\
+                      from(bucket: "bucket")
+                      |> range(start: 2020-01-01T00:00:00+00:00, stop: 2022-01-01T00:00:00+00:00)
+                      |> limit(n: 0, offset: 5)"""
+    )
+
+    assert (pipe(range_query, limit(n=0, offset=5)).to_flux()) == expected
+
+
 def test_pipe_a_partial_pipe():
     start = pipe(from_bucket("bucket"))
     total = pipe(start, range(timedelta(minutes=1)))

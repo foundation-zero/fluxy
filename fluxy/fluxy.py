@@ -364,6 +364,15 @@ class Last:
         return "last()"
 
 
+@dataclass
+class Limit:
+    n: int
+    offset: int
+
+    def to_flux(self) -> str:
+        return f"limit(n: {self.n}, offset: {self.offset})"
+
+
 def from_bucket(bucket: str) -> From:
     return From(bucket)
 
@@ -455,3 +464,7 @@ def last() -> Last:
 
 def mean(column: str) -> Mean:
     return Mean(column)
+
+
+def limit(n: int, offset: int = 0):
+    return Limit(n, offset)
