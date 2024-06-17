@@ -388,6 +388,14 @@ class Sort:
         return f'sort(columns: ["{columns_string}"], desc: {"true" if self.sort_order == Order.DESC else "false"})'
 
 
+@dataclass
+class Literal:
+    expression: str
+
+    def to_flux(self) -> str:
+        return self.expression
+
+
 def from_bucket(bucket: str) -> From:
     return From(bucket)
 
@@ -487,3 +495,7 @@ def limit(n: int, offset: int = 0):
 
 def sort(columns: list[str] = ["_value"], sort_order: Order = Order.ASC):
     return Sort(columns, sort_order)
+
+
+def literal(expression: str):
+    return Literal(expression)
