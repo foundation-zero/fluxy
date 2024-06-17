@@ -373,6 +373,21 @@ class Limit:
         return f"limit(n: {self.n}, offset: {self.offset})"
 
 
+class Order(Enum):
+    DESC = "desc"
+    ASC = "asc"
+
+
+@dataclass
+class Sort:
+    columns: list[str]
+    sort_order: Order
+
+    def to_flux(self) -> str:
+        columns_string = '", "'.join(self.columns)
+        return f'sort(columns: ["{columns_string}"], desc: {"true" if self.sort_order == Order.DESC else "false"})'
+
+
 def from_bucket(bucket: str) -> From:
     return From(bucket)
 
@@ -468,3 +483,7 @@ def mean(column: str) -> Mean:
 
 def limit(n: int, offset: int = 0):
     return Limit(n, offset)
+
+
+def sort(columns: list[str] = ["_value"], sort_order: Order = Order.ASC):
+    return Sort(columns, sort_order)
