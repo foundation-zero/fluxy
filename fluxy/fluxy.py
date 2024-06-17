@@ -359,7 +359,6 @@ class Mean:
         return f'mean(column: "{self.column}")'
 
 
-@dataclass
 class Last:
     def to_flux(self) -> str:
         return "last()"
