@@ -483,3 +483,19 @@ def test_pipe_a_pipe_with_args():
     )
 
     assert total.to_flux() == expected
+
+
+def test_literal(range_query):
+    expected = dedent(
+        """\
+            from(bucket: "bucket")
+            |> range(start: 2020-01-01T00:00:00+00:00, stop: 2022-01-01T00:00:00+00:00)
+            |> filter(fn: (r) => r["topic"] == "test_topic")"""
+    )
+
+    assert (
+        pipe(
+            range_query, literal('filter(fn: (r) => r["topic"] == "test_topic")')
+        ).to_flux()
+        == expected
+    )
