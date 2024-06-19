@@ -499,3 +499,25 @@ def test_literal(range_query):
         ).to_flux()
         == expected
     )
+
+
+def test_group_with_columns(range_query):
+    expected = dedent(
+        """\
+            from(bucket: "bucket")
+            |> range(start: 2020-01-01T00:00:00+00:00, stop: 2022-01-01T00:00:00+00:00)
+            |> group(columns: ["testing"])"""
+    )
+
+    assert pipe(range_query, group(["testing"])).to_flux() == expected
+
+
+def test_group_empty_columns(range_query):
+    expected = dedent(
+        """\
+            from(bucket: "bucket")
+            |> range(start: 2020-01-01T00:00:00+00:00, stop: 2022-01-01T00:00:00+00:00)
+            |> group()"""
+    )
+
+    assert pipe(range_query, group()).to_flux() == expected

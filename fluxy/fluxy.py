@@ -389,6 +389,18 @@ class Sort:
 
 
 @dataclass
+class Group:
+    columns: list[str] | None
+
+    def to_flux(self) -> str:
+        if self.columns:
+            columns_string = '", "'.join(self.columns)
+            return f'group(columns: ["{columns_string}"])'
+        else:
+            return "group()"
+
+
+@dataclass
 class Literal:
     expression: str
 
@@ -499,3 +511,7 @@ def sort(columns: list[str] = ["_value"], sort_order: Order = Order.ASC):
 
 def literal(expression: str):
     return Literal(expression)
+
+
+def group(columns: Optional[list[str]] = None):
+    return Group(columns)
