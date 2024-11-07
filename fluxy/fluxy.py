@@ -519,11 +519,11 @@ def mean(column: str) -> Mean:
     return Mean(column)
 
 
-def max(column: str) -> Mean:
+def max(column: str) -> Max:
     return Max(column)
 
 
-def min(column: str) -> Mean:
+def min(column: str) -> Min:
     return Min(column)
 
 
