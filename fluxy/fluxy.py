@@ -359,6 +359,22 @@ class Mean:
         return f'mean(column: "{self.column}")'
 
 
+@dataclass
+class Max:
+    column: str
+
+    def to_flux(self) -> str:
+        return f'max(column: "{self.column}")'
+
+
+@dataclass
+class Min:
+    column: str
+
+    def to_flux(self) -> str:
+        return f'min(column: "{self.column}")'
+
+
 class Last:
     def to_flux(self) -> str:
         return "last()"
@@ -467,6 +483,8 @@ some = any
 
 class WindowOperation(Enum):
     MEAN = "mean"
+    MAX = "max"
+    MIN = "min"
     LAST = "last"
     SUM = "sum"
 
@@ -499,6 +517,14 @@ def last() -> Last:
 
 def mean(column: str) -> Mean:
     return Mean(column)
+
+
+def max(column: str) -> Max:
+    return Max(column)
+
+
+def min(column: str) -> Min:
+    return Min(column)
 
 
 def limit(n: int, offset: int = 0):

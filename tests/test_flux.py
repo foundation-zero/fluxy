@@ -376,6 +376,28 @@ def test_mean(range_query):
     assert (pipe(range_query, mean("test")).to_flux()) == expected
 
 
+def test_max(range_query):
+    expected = dedent(
+        """\
+                      from(bucket: "bucket")
+                      |> range(start: 2020-01-01T00:00:00+00:00, stop: 2022-01-01T00:00:00+00:00)
+                      |> max(column: "test")"""
+    )
+
+    assert (pipe(range_query, max("test")).to_flux()) == expected
+
+
+def test_min(range_query):
+    expected = dedent(
+        """\
+                      from(bucket: "bucket")
+                      |> range(start: 2020-01-01T00:00:00+00:00, stop: 2022-01-01T00:00:00+00:00)
+                      |> min(column: "test")"""
+    )
+
+    assert (pipe(range_query, min("test")).to_flux()) == expected
+
+
 def test_last(range_query):
     expected = dedent(
         """\
